@@ -207,12 +207,12 @@ SimCLR 结构由两部分组成：
 
 #### 2.4.2 主实验设置汇总
 
-| 实验阶段 | 训练数据 | 是否使用标签 | 模型主体 | 优化器设置 | 优化目标 |
+| 实验阶段 | 训练数据 | 是否使用<br>标签 | 模型主体 | 优化器设置 | 优化目标 |
 | --- | --- | --- | --- | --- | --- |
-| baseline | `1%` 或 `10%` 有标签训练集 | 是 | 随机初始化的 `ResNet18` / `MobileNetV2` | `Adam`, `lr=1e-3`, `weight_decay=1e-4` | 交叉熵分类损失 |
-| SimCLR 预训练 | 全部 `100000` 张训练图片 | 否 | Encoder + Projection Head | `Adam`, `lr=1e-3`, `weight_decay=1e-4` | NT-Xent 对比学习损失 |
-| linear probe | `1%` 或 `10%` 有标签训练集 | 是 | 冻结 Encoder + 新线性分类器 | `Adam`, `lr=1e-3`, `weight_decay=1e-4` | 交叉熵分类损失 |
-| final test | 全部 `20000` 张测试图片 | 是 | 训练完成后的最佳模型 | 不涉及参数更新 | 测试集评估 |
+| baseline | `1%` 或 `10%`<br>有标签训练集 | 是 | 随机初始化的<br>`ResNet18` / `MobileNetV2` | `Adam`<br>`lr=1e-3`<br>`weight_decay=1e-4` | 交叉熵<br>分类损失 |
+| SimCLR 预训练 | 全部 `100000`<br>张训练图片 | 否 | Encoder +<br>Projection Head | `Adam`<br>`lr=1e-3`<br>`weight_decay=1e-4` | NT-Xent<br>对比学习损失 |
+| linear probe | `1%` 或 `10%`<br>有标签训练集 | 是 | 冻结 Encoder +<br>新线性分类器 | `Adam`<br>`lr=1e-3`<br>`weight_decay=1e-4` | 交叉熵<br>分类损失 |
+| final test | 全部 `20000`<br>张测试图片 | 是 | 训练完成后的<br>最佳模型 | 不涉及<br>参数更新 | 测试集评估 |
 
 #### 2.4.3 数据增强设置
 
@@ -232,14 +232,14 @@ SimCLR 结构由两部分组成：
 
 说明如下：
 
-| 增强操作 | 含义 | 参数设置 |
+| 增强<br>操作 | 含义 | 参数设置 |
 | --- | --- | --- |
-| `Resize((32, 32))` | 将输入统一缩放到网络所需的 `32x32` 尺寸 | `image_size=32` |
-| `RandomCrop(32, padding=4)` | 随机平移或位置变化 | `size=32`, `padding=4` |
+| `Resize((32, 32))` | 将输入统一缩放到网络所需的<br>`32x32` 尺寸 | `image_size=32` |
+| `RandomCrop(32, padding=4)` | 随机平移或位置变化 | `size=32`<br>`padding=4` |
 | `RandomHorizontalFlip()` | 随机左右翻转图像 | 默认 `p=0.5` |
-| `ColorJitter(...)` | 随机改变亮度、对比度、饱和度和色调等 | `brightness=0.2`, `contrast=0.2`, `saturation=0.2`, `hue=0.05` |
+| `ColorJitter(...)` | 随机改变亮度、对比度、<br>饱和度和色调等 | `brightness=0.2`<br>`contrast=0.2`<br>`saturation=0.2`<br>`hue=0.05` |
 | `ToTensor()` | 图像转换为张量 | 无 |
-| `Normalize(mean, std)` | 标准化 | `mean=(0.4914, 0.4822, 0.4465)`, `std=(0.2470, 0.2435, 0.2616)` |
+| `Normalize(mean, std)` | 标准化 | `mean=(0.4914, 0.4822, 0.4465)`<br>`std=(0.2470, 0.2435, 0.2616)` |
 
 验证与测试阶段不使用随机增强，仅保留：
 
@@ -253,16 +253,16 @@ SimCLR 结构由两部分组成：
 
 说明如下：
 
-| 增强操作 | 含义 | 参数设置 |
+| 增强<br>操作 | 含义 | 参数设置 |
 | --- | --- | --- |
-| `RandomResizedCrop(32, scale=(0.5, 1.0))` | 从原图中随机裁剪一个比例在 `50%` 到 `100%` 之间的区域，再缩放回 `32x32` | `size=32`, `scale=(0.5, 1.0)` |
+| `RandomResizedCrop(32, scale=(0.5, 1.0))` | 从原图中随机裁剪一个比例在 `50%` 到 `100%` 之间的区域，<br>再缩放回 `32x32` | `size=32`<br>`scale=(0.5, 1.0)` |
 | `RandomHorizontalFlip()` | 随机左右翻转 | 默认 `p=0.5` |
-| `RandomApply([RandomRotation(15)], p=0.3)` | 随机旋转 | `degrees=15`, `p=0.3` |
-| `RandomApply([ColorJitter(...)], p=0.8)` | 以较高概率做颜色扰动 | `brightness=0.8`, `contrast=0.8`, `saturation=0.8`, `hue=0.2`, `p=0.8` |
+| `RandomApply([RandomRotation(15)], p=0.3)` | 随机旋转 | `degrees=15`<br>`p=0.3` |
+| `RandomApply([ColorJitter(...)], p=0.8)` | 以较高概率做颜色扰动 | `brightness=0.8`<br>`contrast=0.8`<br>`saturation=0.8`<br>`hue=0.2`<br>`p=0.8` |
 | `RandomGrayscale(p=0.2)` | 随机转为灰度图 | `p=0.2` |
-| `RandomApply([GaussianBlur(...)], p=0.5)` | 随机施加高斯噪声 | `kernel_size=3`, `sigma=(0.1, 2.0)`, `p=0.5` |
+| `RandomApply([GaussianBlur(...)], p=0.5)` | 随机施加高斯噪声 | `kernel_size=3`<br>`sigma=(0.1, 2.0)`<br>`p=0.5` |
 | `ToTensor()` | 转为张量 | 无 |
-| `Normalize(mean, std)` | 标准化 | `mean=(0.4914, 0.4822, 0.4465)`, `std=(0.2470, 0.2435, 0.2616)` |
+| `Normalize(mean, std)` | 标准化 | `mean=(0.4914, 0.4822, 0.4465)`<br>`std=(0.2470, 0.2435, 0.2616)` |
 
 第一组增强更偏向颜色扰动、灰度化和模糊。
 
@@ -274,17 +274,17 @@ SimCLR 结构由两部分组成：
 
 逐项说明如下：
 
-| 增强操作 | 含义 | 参数设置 |
+| 增强<br>操作 | 含义 | 参数设置 |
 | --- | --- | --- |
-| `RandomResizedCrop(32, scale=(0.35, 1.0))` | 随机裁剪比例更大，允许只保留原图 `35%` 到 `100%` 的区域，再缩放回 `32x32`，比 `simclr_v1` 裁剪更激进 | `size=32`, `scale=(0.35, 1.0)` |
+| `RandomResizedCrop(32, scale=(0.35, 1.0))` | 随机裁剪比例更大，允许只保留原图 `35%` 到 `100%` 的区域，<br>再缩放回 `32x32`，比 `simclr_v1` 裁剪更激进 | `size=32`<br>`scale=(0.35, 1.0)` |
 | `RandomHorizontalFlip()` | 随机左右翻转 | 默认 `p=0.5` |
-| `RandomApply([RandomAffine(...)], p=0.8)` | 以较高概率施加平移、缩放和剪切 | `degrees=0`, `translate=(0.15, 0.15)`, `scale=(0.8, 1.2)`, `shear=12`, `p=0.8` |
+| `RandomApply([RandomAffine(...)], p=0.8)` | 以较高概率施加平移、缩放和剪切 | `degrees=0`<br>`translate=(0.15, 0.15)`<br>`scale=(0.8, 1.2)`<br>`shear=12`<br>`p=0.8` |
 | `RandomAutocontrast(p=0.5)` | 自动拉伸图像对比度范围 | `p=0.5` |
-| `RandomEqualize(p=0.3)` | 对直方图做均衡化处理，改变整体亮度分布 | `p=0.3` |
-| `RandomApply([RandomPosterize(bits=3)], p=0.4)` | 随机降低颜色位深 | `bits=3`, `p=0.4` |
-| `RandomSolarize(threshold=128, p=0.3)` | 随机对高于阈值的像素做反相 | `threshold=128`, `p=0.3` |
+| `RandomEqualize(p=0.3)` | 对直方图做均衡化处理，<br>改变整体亮度分布 | `p=0.3` |
+| `RandomApply([RandomPosterize(bits=3)], p=0.4)` | 随机降低颜色位深 | `bits=3`<br>`p=0.4` |
+| `RandomSolarize(threshold=128, p=0.3)` | 随机对高于阈值的像素做反相 | `threshold=128`<br>`p=0.3` |
 | `ToTensor()` | 转为张量 | 无 |
-| `Normalize(mean, std)` | 标准化 | `mean=(0.4914, 0.4822, 0.4465)`, `std=(0.2470, 0.2435, 0.2616)` |
+| `Normalize(mean, std)` | 标准化 | `mean=(0.4914, 0.4822, 0.4465)`<br>`std=(0.2470, 0.2435, 0.2616)` |
 
 第二组增强更偏向几何仿射变换和色调的重新映射，与第一组之间有明显差异。
 
@@ -405,11 +405,12 @@ SimCLR 结构由两部分组成：
 
 测试结果进一步验证了这一点：`r0.1` 最优，`r0.01` 第二，`m0.1` 第三，`m0.01` 最低。说明在当前实现与数据划分下，增加标签比例仍然能够显著提升 SimCLR 下游性能，而 `ResNet18` 也整体优于 `MobileNetV2`。
 
-为了更直观地展示差异，下面给出了 `label10%` 条件下两种 SimCLR 结果的测试混淆矩阵。图一是`ResNet18`，图二是`MobileNetV2`。
+为了更直观地展示差异，下面给出了 `label10%` 条件下两种 SimCLR 结果的测试混淆矩阵。左图是 `ResNet18`，右图是 `MobileNetV2`。
 
-![Linear Probe ResNet18 Label10 混淆矩阵](images/raw/linear_probe_resnet18_label10_cm.png)
-
-![Linear Probe MobileNetV2 Label10 混淆矩阵](images/raw/linear_probe_mobilenet_label10_cm.png)
+<p align="center">
+  <img src="images/raw/linear_probe_resnet18_label10_cm.png" alt="Linear Probe ResNet18 Label10 混淆矩阵" width="48%" />
+  <img src="images/raw/linear_probe_mobilenet_label10_cm.png" alt="Linear Probe MobileNetV2 Label10 混淆矩阵" width="48%" />
+</p>
 
 可以看到，在同样条件下，`ResNet18` 的主对角线更清晰，误分区域更少；`MobileNetV2` 则存在更多交叉误分。
 
@@ -470,8 +471,60 @@ SimCLR 结构由两部分组成：
 
 ### 5.2 附加实验 2：Projection Head 结构分析
 
-建议在完成附加实验 2 运行后补充：
+本附加实验固定以下设置不变：
 
-1. `mlp / mlp_bn / mlp_wide` 的预训练损失曲线对比图
-2. 不同 head 结构在 `label10` 下的线性评估测试指标表格
-3. 对 BatchNorm 和隐藏层宽度变化影响的分析
+1. Encoder 为 `ResNet18`。
+2. 数据增强方式固定为 `simclr_v1`。
+3. 有标签比例固定为 `10%`。
+4. 对比学习损失固定为主实验默认的 `NT-Xent`。
+5. 仅改变 Projection Head 结构，分别比较 `mlp`、`mlp_bn` 和 `mlp_wide`。
+
+其中：
+
+1. `mlp` 为主实验默认使用的两层 MLP 投影头。
+2. `mlp_bn` 在中间隐藏层后加入 `BatchNorm1d`。
+3. `mlp_wide` 将隐藏层宽度扩展为 encoder 输出维度的 `2.0` 倍。
+
+#### 5.2.1 预训练阶段损失曲线比较
+
+下图给出了三种 Projection Head 在预训练阶段的训练损失变化。由于三种 head 使用的损失函数相同，因此这里的 loss 曲线具有直接可比性。
+
+![Additional Experiment 2 Pretrain Compare](images/generated/additional_exp2_pretrain_compare.png)
+
+从预训练曲线可以看出：
+
+1. 三种 head 都能够稳定收敛，当前投影头结构变化基本不会破坏 SimCLR 预训练过程。
+2. 其中`mlp_bn` 的训练损失最低，说明加入 BatchNorm 后预训练阶段的优化更容易。
+3. `mlp` 与 `mlp_wide` 的曲线非常接近，仅扩大隐藏层宽度，对预训练损失本身的影响并不大。
+
+#### 5.2.2 下游分类器训练过程比较
+
+为了比较不同 Projection Head 学到的表征质量，下面给出三种 head 在相同分类器设置下的训练损失、验证损失、验证准确率和验证 F1 曲线。
+
+![Additional Experiment 2 Probe Compare](images/generated/additional_exp2_probe_compare.png)
+
+从下游训练曲线可以看出：
+
+1. `mlp_wide` 的验证损失最低，验证准确率和验证 F1 也最高，是三种结构中整体表现最好的。
+2. `mlp` 的表现非常接近 `mlp_wide`，说明两层的 MLP 已经足够有效。
+3. 反常的是`mlp_bn` 虽然在预训练阶段 loss 更低，但下游分类效果反而略低于另外两种结构，说明更低的预训练损失并不一定直接对应更强的下游判别能力。
+
+#### 5.2.3 最终测试结果比较
+
+下图汇总了三种 Projection Head 对应模型在测试集上的最终结果。
+
+![Additional Experiment 2 Test Compare](images/generated/additional_exp2_test_compare.png)
+
+最终测试结果如下：
+
+1. `mlp_wide`：`Accuracy=0.8425`，`F1=0.8431`。
+2. `mlp`：`Accuracy=0.8389`，`F1=0.8428`。
+3. `mlp_bn`：`Accuracy=0.8281`，`F1=0.8357`。
+
+可以看到，三种结构之间的差异整体不算特别大，其中 `mlp_wide` 是最佳的结构，说明适度增加投影头隐藏层宽度，确实有助于提升表达能力。但是`mlp` 与 `mlp_wide` 的差距仅约 `0.36%`，这也证明主实验默认采用的 `mlp` 已经有足够强的表达能力。
+
+为了更直观地展示三种 head 的分类差异，下面给出它们在测试集上的混淆矩阵。
+
+![Additional Experiment 2 Confusion Matrices](images/generated/additional_exp2_confusion_matrices.png)
+
+从混淆矩阵可以看到，`mlp_wide` 的主对角线最清晰，误分区域最少；`mlp` 与其非常接近；`mlp_bn` 则存在更多交叉误分。综合来看，附加实验 2 表明 Projection Head 结构确实会影响 SimCLR 的最终效果，但这种影响幅度小于附加实验 1 中损失函数带来的差异。在本实验设定下，`mlp_wide` 是表现最好的结构，而默认 `mlp` 在结构更简单的前提下也已经足够有效。

@@ -79,6 +79,34 @@ EXP1_LOSS_CONFIGS = [
     },
 ]
 
+EXP2_BASE_DIR = OUTPUT_DIR / "additional_experiment_2" / "additional_experiment_2_resnet18_simclr_v1"
+EXP2_HEAD_CONFIGS = [
+    {
+        "name": "MLP",
+        "code": "mlp",
+        "pretrain_history": EXP2_BASE_DIR / "head_mlp" / "pretrain" / "curves" / "pretraining_history.csv",
+        "probe_history": EXP2_BASE_DIR / "head_mlp" / "linear_probe_label10" / "curves" / "training_history.csv",
+        "test_metrics": EXP2_BASE_DIR / "head_mlp" / "final_test_label10" / "results" / "test_metrics.json",
+        "test_matrix": EXP2_BASE_DIR / "head_mlp" / "final_test_label10" / "matrices" / "test_confusion_matrix.png",
+    },
+    {
+        "name": "MLP+BN",
+        "code": "mlp_bn",
+        "pretrain_history": EXP2_BASE_DIR / "head_mlp_bn" / "pretrain" / "curves" / "pretraining_history.csv",
+        "probe_history": EXP2_BASE_DIR / "head_mlp_bn" / "linear_probe_label10" / "curves" / "training_history.csv",
+        "test_metrics": EXP2_BASE_DIR / "head_mlp_bn" / "final_test_label10" / "results" / "test_metrics.json",
+        "test_matrix": EXP2_BASE_DIR / "head_mlp_bn" / "final_test_label10" / "matrices" / "test_confusion_matrix.png",
+    },
+    {
+        "name": "MLP-Wide",
+        "code": "mlp_wide",
+        "pretrain_history": EXP2_BASE_DIR / "head_mlp_wide" / "pretrain" / "curves" / "pretraining_history.csv",
+        "probe_history": EXP2_BASE_DIR / "head_mlp_wide" / "linear_probe_label10" / "curves" / "training_history.csv",
+        "test_metrics": EXP2_BASE_DIR / "head_mlp_wide" / "final_test_label10" / "results" / "test_metrics.json",
+        "test_matrix": EXP2_BASE_DIR / "head_mlp_wide" / "final_test_label10" / "matrices" / "test_confusion_matrix.png",
+    },
+]
+
 
 def ensure_dirs():
     RAW_DIR.mkdir(parents=True, exist_ok=True)
@@ -624,6 +652,157 @@ def plot_additional_exp1_confusion_matrices():
     print(f"Generated: {output_path}")
 
 
+def plot_additional_exp2_pretrain_compare():
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.2))
+    plotted = False
+
+    for ax, config in zip(axes, EXP2_HEAD_CONFIGS):
+        path = config["pretrain_history"]
+        if not path.exists():
+            print(f"Skip missing additional exp2 pretrain csv: {path}")
+            ax.axis("off")
+            continue
+        rows = read_csv(path)
+        epochs = [int(row["epoch"]) for row in rows]
+        losses = [float(row["train_loss"]) for row in rows]
+        ax.plot(epochs, losses, marker="o")
+        ax.set_title(config["name"])
+        ax.set_xlabel("Epoch")
+        ax.set_ylabel("Train Loss")
+        plotted = True
+
+    if not plotted:
+        plt.close(fig)
+        return
+
+    fig.suptitle("Additional Experiment 2: Pretraining Curves of Different Projection Heads", fontsize=12)
+    fig.tight_layout()
+    output_path = GENERATED_DIR / "additional_exp2_pretrain_compare.png"
+    fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Generated: {output_path}")
+
+
+def plot_additional_exp2_probe_compare():
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    plotted = False
+
+    for config in EXP2_HEAD_CONFIGS:
+        path = config["probe_history"]
+        if not path.exists():
+            print(f"Skip missing additional exp2 probe csv: {path}")
+            continue
+        rows = read_csv(path)
+        epochs = [int(row["epoch"]) for row in rows]
+        label = config["name"]
+        axes[0, 0].plot(epochs, [float(row["train_loss"]) for row in rows], marker="o", label=label)
+        axes[0, 1].plot(epochs, [float(row["val_loss"]) for row in rows], marker="o", label=label)
+        axes[1, 0].plot(epochs, [float(row["val_acc"]) for row in rows], marker="o", label=label)
+        axes[1, 1].plot(epochs, [float(row["val_f1"]) for row in rows], marker="o", label=label)
+        plotted = True
+
+    if not plotted:
+        plt.close(fig)
+        return
+
+    axes[0, 0].set_title("Linear Probe Train Loss")
+    axes[0, 0].set_xlabel("Epoch")
+    axes[0, 0].set_ylabel("Loss")
+    axes[0, 0].legend()
+
+    axes[0, 1].set_title("Linear Probe Val Loss")
+    axes[0, 1].set_xlabel("Epoch")
+    axes[0, 1].set_ylabel("Loss")
+    axes[0, 1].legend()
+
+    axes[1, 0].set_title("Linear Probe Val Accuracy")
+    axes[1, 0].set_xlabel("Epoch")
+    axes[1, 0].set_ylabel("Accuracy")
+    axes[1, 0].set_ylim(0.0, 1.0)
+    axes[1, 0].legend()
+
+    axes[1, 1].set_title("Linear Probe Val F1")
+    axes[1, 1].set_xlabel("Epoch")
+    axes[1, 1].set_ylabel("F1 Score")
+    axes[1, 1].set_ylim(0.0, 1.0)
+    axes[1, 1].legend()
+
+    fig.tight_layout()
+    output_path = GENERATED_DIR / "additional_exp2_probe_compare.png"
+    fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Generated: {output_path}")
+
+
+def plot_additional_exp2_test_compare():
+    labels = []
+    acc = []
+    f1 = []
+
+    for config in EXP2_HEAD_CONFIGS:
+        path = config["test_metrics"]
+        if not path.exists():
+            print(f"Skip missing additional exp2 test metrics: {path}")
+            continue
+        metrics = read_json(path)
+        labels.append(config["name"])
+        acc.append(metrics["test_accuracy"])
+        f1.append(metrics["test_f1"])
+
+    if not labels:
+        return
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+    positions = list(range(len(labels)))
+
+    axes[0].bar(positions, acc, width=0.6)
+    axes[0].set_title("Additional Experiment 2 Test Accuracy")
+    axes[0].set_ylabel("Accuracy")
+    axes[0].set_xticks(positions)
+    axes[0].set_xticklabels(labels)
+    axes[0].set_ylim(0.0, 1.0)
+
+    axes[1].bar(positions, f1, width=0.6)
+    axes[1].set_title("Additional Experiment 2 Test F1")
+    axes[1].set_ylabel("F1 Score")
+    axes[1].set_xticks(positions)
+    axes[1].set_xticklabels(labels)
+    axes[1].set_ylim(0.0, 1.0)
+
+    fig.tight_layout()
+    output_path = GENERATED_DIR / "additional_exp2_test_compare.png"
+    fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Generated: {output_path}")
+
+
+def plot_additional_exp2_confusion_matrices():
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+    plotted = False
+
+    for ax, config in zip(axes, EXP2_HEAD_CONFIGS):
+        path = config["test_matrix"]
+        if not path.exists():
+            print(f"Skip missing additional exp2 confusion matrix: {path}")
+            ax.axis("off")
+            continue
+        image = plt.imread(path)
+        ax.imshow(image)
+        ax.set_title(config["name"])
+        ax.axis("off")
+        plotted = True
+
+    if not plotted:
+        plt.close(fig)
+        return
+
+    fig.tight_layout()
+    output_path = GENERATED_DIR / "additional_exp2_confusion_matrices.png"
+    fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Generated: {output_path}")
+
+
 def copy_raw_images():
     images = {
         "augmentation_simclr_v1.png": OUTPUT_DIR / "augmentation_views" / "views_simclr_v1-simclr_v2_img4_pair2" / "simclr_v1" / "augmentation_views.png",
@@ -654,6 +833,10 @@ def main():
     plot_additional_exp1_probe_compare()
     plot_additional_exp1_test_compare()
     plot_additional_exp1_confusion_matrices()
+    plot_additional_exp2_pretrain_compare()
+    plot_additional_exp2_probe_compare()
+    plot_additional_exp2_test_compare()
+    plot_additional_exp2_confusion_matrices()
 
 
 if __name__ == "__main__":
