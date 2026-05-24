@@ -319,16 +319,30 @@ feature_dim -> Linear(feature_dim, 2)
 
 说明如下：
 
-| 增强<br>操作 | 含义 | 参数设置 |
-| --- | --- | --- |
-| <code>RandomResizedCrop(32,</code><br><code>scale=(0.5, 1.0))</code> | 从原图中随机裁剪一个比例在 `50%` 到 `100%` 之间的区域，<br>再缩放回 `32x32` | `size=32`<br>`scale=(0.5, 1.0)` |
-| `RandomHorizontalFlip()` | 随机左右翻转 | 默认 `p=0.5` |
-| <code>RandomApply([RandomRotation(15)],</code><br><code>p=0.3)</code> | 随机旋转 | `degrees=15`<br>`p=0.3` |
-| <code>RandomApply([ColorJitter(...)],</code><br><code>p=0.8)</code> | 以较高概率做颜色扰动 | `brightness=0.8`<br>`contrast=0.8`<br>`saturation=0.8`<br>`hue=0.2`<br>`p=0.8` |
-| `RandomGrayscale(p=0.2)` | 随机转为灰度图 | `p=0.2` |
-| <code>RandomApply([GaussianBlur(...)],</code><br><code>p=0.5)</code> | 随机施加高斯噪声 | `kernel_size=3`<br>`sigma=(0.1, 2.0)`<br>`p=0.5` |
-| `ToTensor()` | 转为张量 | 无 |
-| `Normalize(mean, std)` | 标准化 | `mean=(0.4914, 0.4822, 0.4465)`<br>`std=(0.2470, 0.2435, 0.2616)` |
+1. `RandomResizedCrop(32, scale=(0.5, 1.0))`
+   含义：从原图中随机裁剪一个比例在 `50%` 到 `100%` 之间的区域，再缩放回 `32x32`。
+   参数：`size=32`, `scale=(0.5, 1.0)`
+2. `RandomHorizontalFlip()`
+   含义：随机左右翻转。
+   参数：默认 `p=0.5`
+3. `RandomApply([RandomRotation(15)], p=0.3)`
+   含义：随机旋转。
+   参数：`degrees=15`, `p=0.3`
+4. `RandomApply([ColorJitter(...)], p=0.8)`
+   含义：以较高概率做颜色扰动。
+   参数：`brightness=0.8`, `contrast=0.8`, `saturation=0.8`, `hue=0.2`, `p=0.8`
+5. `RandomGrayscale(p=0.2)`
+   含义：随机转为灰度图。
+   参数：`p=0.2`
+6. `RandomApply([GaussianBlur(...)], p=0.5)`
+   含义：随机施加高斯噪声。
+   参数：`kernel_size=3`, `sigma=(0.1, 2.0)`, `p=0.5`
+7. `ToTensor()`
+   含义：转为张量。
+   参数：无
+8. `Normalize(mean, std)`
+   含义：标准化。
+   参数：`mean=(0.4914, 0.4822, 0.4465)`, `std=(0.2470, 0.2435, 0.2616)`
 
 第一组增强更偏向颜色扰动、灰度化和模糊。
 
@@ -340,17 +354,33 @@ feature_dim -> Linear(feature_dim, 2)
 
 逐项说明如下：
 
-| 增强<br>操作 | 含义 | 参数设置 |
-| --- | --- | --- |
-| <code>RandomResizedCrop(32,</code><br><code>scale=(0.35, 1.0))</code> | 随机裁剪比例更大，允许只保留原图 `35%` 到 `100%` 的区域，<br>再缩放回 `32x32`，比 `simclr_v1` 裁剪更激进 | `size=32`<br>`scale=(0.35, 1.0)` |
-| `RandomHorizontalFlip()` | 随机左右翻转 | 默认 `p=0.5` |
-| <code>RandomApply([RandomAffine(...)],</code><br><code>p=0.8)</code> | 以较高概率施加平移、缩放和剪切 | `degrees=0`<br>`translate=(0.15, 0.15)`<br>`scale=(0.8, 1.2)`<br>`shear=12`<br>`p=0.8` |
-| `RandomAutocontrast(p=0.5)` | 自动拉伸图像对比度范围 | `p=0.5` |
-| `RandomEqualize(p=0.3)` | 对直方图做均衡化处理，<br>改变整体亮度分布 | `p=0.3` |
-| <code>RandomApply([RandomPosterize(bits=3)],</code><br><code>p=0.4)</code> | 随机降低颜色位深 | `bits=3`<br>`p=0.4` |
-| <code>RandomSolarize(threshold=128,</code><br><code>p=0.3)</code> | 随机对高于阈值的像素做反相 | `threshold=128`<br>`p=0.3` |
-| `ToTensor()` | 转为张量 | 无 |
-| `Normalize(mean, std)` | 标准化 | `mean=(0.4914, 0.4822, 0.4465)`<br>`std=(0.2470, 0.2435, 0.2616)` |
+1. `RandomResizedCrop(32, scale=(0.35, 1.0))`
+   含义：随机裁剪比例更大，允许只保留原图 `35%` 到 `100%` 的区域，再缩放回 `32x32`，比 `simclr_v1` 裁剪更激进。
+   参数：`size=32`, `scale=(0.35, 1.0)`
+2. `RandomHorizontalFlip()`
+   含义：随机左右翻转。
+   参数：默认 `p=0.5`
+3. `RandomApply([RandomAffine(...)], p=0.8)`
+   含义：以较高概率施加平移、缩放和剪切。
+   参数：`degrees=0`, `translate=(0.15, 0.15)`, `scale=(0.8, 1.2)`, `shear=12`, `p=0.8`
+4. `RandomAutocontrast(p=0.5)`
+   含义：自动拉伸图像对比度范围。
+   参数：`p=0.5`
+5. `RandomEqualize(p=0.3)`
+   含义：对直方图做均衡化处理，改变整体亮度分布。
+   参数：`p=0.3`
+6. `RandomApply([RandomPosterize(bits=3)], p=0.4)`
+   含义：随机降低颜色位深。
+   参数：`bits=3`, `p=0.4`
+7. `RandomSolarize(threshold=128, p=0.3)`
+   含义：随机对高于阈值的像素做反相。
+   参数：`threshold=128`, `p=0.3`
+8. `ToTensor()`
+   含义：转为张量。
+   参数：无
+9. `Normalize(mean, std)`
+   含义：标准化。
+   参数：`mean=(0.4914, 0.4822, 0.4465)`, `std=(0.2470, 0.2435, 0.2616)`
 
 第二组增强更偏向几何仿射变换和色调的重新映射，与第一组之间有明显差异。
 
