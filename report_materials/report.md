@@ -164,14 +164,80 @@ x
 | Stage7 | Inverted Residual | `t=6, c=320, n=1, s=1` | `2x2 -> 2x2` |
 | Head | `1x1 Conv + GAP + FC/Identity` | 高维特征映射 | `2x2 -> 1x1` |
 
-### 2.3 SimCLR 设置
+### 2.3 SimCLR 设置与分类器网络结构
 
-SimCLR 结构由两部分组成：
+本实验中，`ResNet18` 与 `MobileNetV2` 既作为监督学习 baseline 的主干网络，也作为 SimCLR 预训练与后续分类阶段的共享 backbone。
 
-1. Encoder
-2. Projection Head：`Linear -> ReLU -> Linear`
+#### 2.3.1 无监督预训练阶段网络结构
 
-默认主实验中的对比学习损失为 `NT-Xent`，投影维度为 `64`。
+在 SimCLR 预训练阶段，输入并不是单张图片，而是同一张原图经过随机增强后得到的两个 view，记为 `view1` 和 `view2`。它们会分别通过同一个 Encoder 和同一个 Projection Head，最后在投影空间中计算对比学习损失。
+
+对应结构可以表示为：
+
+```text
+image
+-> augmentation pipeline
+-> view1, view2
+
+view1 -> Encoder -> Projection Head -> projection z1
+view2 -> Encoder -> Projection Head -> projection z2
+
+(z1, z2) -> NT-Xent Loss
+```
+
+1. `Encoder` 是负责提取图像特征的主干网络，本实验中取 `ResNet18` 或 `MobileNetV2`。
+2. `Projection Head` 是附加在 encoder 后的两层 MLP，结构为 `Linear -> ReLU -> Linear`，其作用是把 encoder 输出映射到更适合做对比学习的投影空间。
+
+主实验默认使用的 Projection Head 结构为：
+
+```text
+feature_dim
+-> Linear(feature_dim, hidden_dim)
+-> ReLU
+-> Linear(hidden_dim, 64)
+```
+
+其中：
+
+1. `projection_dim=64`。
+2. `hidden_dim` 默认等于 encoder 的输出维度。
+3. 对 `ResNet18`，encoder 输出维度为 `512`。
+4. 对 `MobileNetV2`，encoder 输出维度为其分类头输入维度。
+
+结合主干网络后，可以把无监督预训练阶段写成：
+
+```text
+ResNet18 / MobileNetV2 Encoder
++ Projection Head
++ NT-Xent contrastive loss
+```
+
+#### 2.3.2 后续分类阶段网络结构
+
+完成 SimCLR 预训练后，并不会直接使用 Projection Head 做分类，而是保留已经训练好的 Encoder，丢弃 Projection Head，再接一个新的线性分类器进行下游二分类。
+
+后续分类阶段的结构为：
+
+```text
+image
+-> Encoder
+-> Linear Classifier
+-> logits(REAL / FAKE)
+```
+
+其中分类器部分可以写成：
+
+```text
+feature_dim -> Linear(feature_dim, 2)
+```
+
+因为本实验是二分类任务，所以最终输出维度为 `2`。
+
+这种设计的意义在于：
+
+1. baseline 反映“只依赖少量标签直接监督学习”时模型能达到的效果。
+2. linear probe 反映“无监督预训练是否学到了可迁移表征”。
+3. 若 linear probe 表现较好，说明 SimCLR 预训练阶段提取到的特征具有较强判别能力。
 
 ### 2.4 训练设置
 
@@ -255,12 +321,12 @@ SimCLR 结构由两部分组成：
 
 | 增强<br>操作 | 含义 | 参数设置 |
 | --- | --- | --- |
-| `RandomResizedCrop(32, scale=(0.5, 1.0))` | 从原图中随机裁剪一个比例在 `50%` 到 `100%` 之间的区域，<br>再缩放回 `32x32` | `size=32`<br>`scale=(0.5, 1.0)` |
+| <code>RandomResizedCrop(32,</code><br><code>scale=(0.5, 1.0))</code> | 从原图中随机裁剪一个比例在 `50%` 到 `100%` 之间的区域，<br>再缩放回 `32x32` | `size=32`<br>`scale=(0.5, 1.0)` |
 | `RandomHorizontalFlip()` | 随机左右翻转 | 默认 `p=0.5` |
-| `RandomApply([RandomRotation(15)], p=0.3)` | 随机旋转 | `degrees=15`<br>`p=0.3` |
-| `RandomApply([ColorJitter(...)], p=0.8)` | 以较高概率做颜色扰动 | `brightness=0.8`<br>`contrast=0.8`<br>`saturation=0.8`<br>`hue=0.2`<br>`p=0.8` |
+| <code>RandomApply([RandomRotation(15)],</code><br><code>p=0.3)</code> | 随机旋转 | `degrees=15`<br>`p=0.3` |
+| <code>RandomApply([ColorJitter(...)],</code><br><code>p=0.8)</code> | 以较高概率做颜色扰动 | `brightness=0.8`<br>`contrast=0.8`<br>`saturation=0.8`<br>`hue=0.2`<br>`p=0.8` |
 | `RandomGrayscale(p=0.2)` | 随机转为灰度图 | `p=0.2` |
-| `RandomApply([GaussianBlur(...)], p=0.5)` | 随机施加高斯噪声 | `kernel_size=3`<br>`sigma=(0.1, 2.0)`<br>`p=0.5` |
+| <code>RandomApply([GaussianBlur(...)],</code><br><code>p=0.5)</code> | 随机施加高斯噪声 | `kernel_size=3`<br>`sigma=(0.1, 2.0)`<br>`p=0.5` |
 | `ToTensor()` | 转为张量 | 无 |
 | `Normalize(mean, std)` | 标准化 | `mean=(0.4914, 0.4822, 0.4465)`<br>`std=(0.2470, 0.2435, 0.2616)` |
 
@@ -276,13 +342,13 @@ SimCLR 结构由两部分组成：
 
 | 增强<br>操作 | 含义 | 参数设置 |
 | --- | --- | --- |
-| `RandomResizedCrop(32, scale=(0.35, 1.0))` | 随机裁剪比例更大，允许只保留原图 `35%` 到 `100%` 的区域，<br>再缩放回 `32x32`，比 `simclr_v1` 裁剪更激进 | `size=32`<br>`scale=(0.35, 1.0)` |
+| <code>RandomResizedCrop(32,</code><br><code>scale=(0.35, 1.0))</code> | 随机裁剪比例更大，允许只保留原图 `35%` 到 `100%` 的区域，<br>再缩放回 `32x32`，比 `simclr_v1` 裁剪更激进 | `size=32`<br>`scale=(0.35, 1.0)` |
 | `RandomHorizontalFlip()` | 随机左右翻转 | 默认 `p=0.5` |
-| `RandomApply([RandomAffine(...)], p=0.8)` | 以较高概率施加平移、缩放和剪切 | `degrees=0`<br>`translate=(0.15, 0.15)`<br>`scale=(0.8, 1.2)`<br>`shear=12`<br>`p=0.8` |
+| <code>RandomApply([RandomAffine(...)],</code><br><code>p=0.8)</code> | 以较高概率施加平移、缩放和剪切 | `degrees=0`<br>`translate=(0.15, 0.15)`<br>`scale=(0.8, 1.2)`<br>`shear=12`<br>`p=0.8` |
 | `RandomAutocontrast(p=0.5)` | 自动拉伸图像对比度范围 | `p=0.5` |
 | `RandomEqualize(p=0.3)` | 对直方图做均衡化处理，<br>改变整体亮度分布 | `p=0.3` |
-| `RandomApply([RandomPosterize(bits=3)], p=0.4)` | 随机降低颜色位深 | `bits=3`<br>`p=0.4` |
-| `RandomSolarize(threshold=128, p=0.3)` | 随机对高于阈值的像素做反相 | `threshold=128`<br>`p=0.3` |
+| <code>RandomApply([RandomPosterize(bits=3)],</code><br><code>p=0.4)</code> | 随机降低颜色位深 | `bits=3`<br>`p=0.4` |
+| <code>RandomSolarize(threshold=128,</code><br><code>p=0.3)</code> | 随机对高于阈值的像素做反相 | `threshold=128`<br>`p=0.3` |
 | `ToTensor()` | 转为张量 | 无 |
 | `Normalize(mean, std)` | 标准化 | `mean=(0.4914, 0.4822, 0.4465)`<br>`std=(0.2470, 0.2435, 0.2616)` |
 
@@ -391,6 +457,8 @@ SimCLR 结构由两部分组成：
 
 从测试结果看，`ResNet18` 两组设置均是 baseline 更优；`MobileNetV2` 中只有 `m0.01` 是 SimCLR 更优，而 `m0.1` 仍是 baseline 更优。这说明 SimCLR 的收益与 Encoder 结构以及标签量都有关，不是对所有设置都必然提升。但从 `m0.01` 这一组可以看出，在模型轻量化且标签稀缺的背景下，SimCLR 的确能够显著改善最终分类效果。
 
+同时我们可以非常明显的注意到，当标签数据量显著改变时，我们的无监督学习方案具有更强的鲁棒性，性能虽然随着标签比例从0.1到0.01而有所下降，但是下降并不剧烈且较为平稳。
+
 #### 4.2.2 仅在 SimCLR 内部：四种网络设置之间的比较
 
 下图仅保留 SimCLR 方法，比较 `r0.1`、`r0.01`、`m0.1`、`m0.01` 四种设置之间的训练过程差异。图中给出了训练损失、验证损失、验证准确率和验证 F1 的整体对比。
@@ -408,8 +476,8 @@ SimCLR 结构由两部分组成：
 为了更直观地展示差异，下面给出了 `label10%` 条件下两种 SimCLR 结果的测试混淆矩阵。左图是 `ResNet18`，右图是 `MobileNetV2`。
 
 <p align="center">
-  <img src="images/raw/linear_probe_resnet18_label10_cm.png" alt="Linear Probe ResNet18 Label10 混淆矩阵" width="48%" />
-  <img src="images/raw/linear_probe_mobilenet_label10_cm.png" alt="Linear Probe MobileNetV2 Label10 混淆矩阵" width="48%" />
+  <img src="images/raw/linear_probe_resnet18_label10_cm.png" alt="Linear Probe ResNet18 Label10 混淆矩阵" width="34%" />
+  <img src="images/raw/linear_probe_mobilenet_label10_cm.png" alt="Linear Probe MobileNetV2 Label10 混淆矩阵" width="34%" />
 </p>
 
 可以看到，在同样条件下，`ResNet18` 的主对角线更清晰，误分区域更少；`MobileNetV2` 则存在更多交叉误分。
@@ -528,3 +596,22 @@ SimCLR 结构由两部分组成：
 ![Additional Experiment 2 Confusion Matrices](images/generated/additional_exp2_confusion_matrices.png)
 
 从混淆矩阵可以看到，`mlp_wide` 的主对角线最清晰，误分区域最少；`mlp` 与其非常接近；`mlp_bn` 则存在更多交叉误分。综合来看，附加实验 2 表明 Projection Head 结构确实会影响 SimCLR 的最终效果，但这种影响幅度小于附加实验 1 中损失函数带来的差异。在本实验设定下，`mlp_wide` 是表现最好的结构，而默认 `mlp` 在结构更简单的前提下也已经足够有效。
+
+## 6. 实验总结与思考
+
+### 6.1 实验总结：
+
+1. 在当前 CIFAKE 二分类任务上，具有相对更强的表达能力的`ResNet18` 的整体表现稳定优于轻量化的`MobileNetV2`。
+2. 标签比例从 `1%` 提升到 `10%` 后，无论是 baseline 还是 SimCLR 下游分类，性能都出现明显提升。但是相比于baseline，SimCLR对于标签比例的变化有更好的鲁棒性。
+3. 值得注意的是，SimCLR 并不是在所有设置下都必然优于监督学习 baseline，但在轻量模型和低标签条件下，它能够显著改善分类效果，体现出无监督预训练的实际价值。
+4. 附加实验 1 表明，对比学习损失函数的选择对最终性能影响非常明显，其中 `NT-Xent` 明显优于 `Triplet` 和 `Contrastive`。
+5. 附加实验 2 表明，Projection Head 结构确实会影响结果，但这种影响幅度小于损失函数本身；`mlp_wide` 最优，而默认 `mlp` 也已经有足够的表达能力。
+
+### 6.2 结果思考
+
+
+### 6.3 后续可改进方向
+
+1. 由于硬件性能的限制，本实验实际上可以考虑更长的训练轮数，观察 SimCLR 预训练是否在更充分训练后能够进一步提升下游性能。
+2. 考虑在 `ResNet18` 与 `MobileNetV2` 之外加入更多 Encoder模型。
+3. 尝试更丰富的数据增强组合，关注哪些增强最有助于区分 `REAL` 与 `FAKE` 图像中的生成痕迹。
