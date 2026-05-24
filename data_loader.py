@@ -7,6 +7,7 @@ from torchvision import datasets, transforms
 
 CIFAR_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR_STD = (0.2470, 0.2435, 0.2616)
+SIMCLR_AUGMENTATIONS = ("simclr_v1", "simclr_v2")
 
 
 class TwoCropTransform:
@@ -15,6 +16,15 @@ class TwoCropTransform:
 
     def __call__(self, image):
         return self.transform(image), self.transform(image)
+
+
+def build_visualization_transform(image_size=32):
+    return transforms.Compose(
+        [
+            transforms.Resize((image_size, image_size)),
+            transforms.ToTensor(),
+        ]
+    )
 
 
 def build_transforms(image_size=32):
@@ -43,29 +53,62 @@ def build_transforms(image_size=32):
     return train_transform, eval_transform
 
 
-def build_simclr_transform(image_size=32):
-    color_jitter = transforms.ColorJitter(
-        brightness=0.8,
-        contrast=0.8,
-        saturation=0.8,
-        hue=0.2,
+def build_simclr_view_transform(image_size=32, augment="simclr_v1"):
+    if augment == "simclr_v1":
+        color_jitter = transforms.ColorJitter(
+            brightness=0.8,
+            contrast=0.8,
+            saturation=0.8,
+            hue=0.2,
+        )
+        return transforms.Compose(
+            [
+                transforms.RandomResizedCrop(image_size, scale=(0.5, 1.0)),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomApply([transforms.RandomRotation(15)], p=0.3),
+                transforms.RandomApply([color_jitter], p=0.8),
+                transforms.RandomGrayscale(p=0.2),
+                transforms.RandomApply(
+                    [transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0))],
+                    p=0.5,
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
+            ]
+        )
+
+    if augment == "simclr_v2":
+        return transforms.Compose(
+            [
+                transforms.RandomResizedCrop(image_size, scale=(0.35, 1.0)),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomApply(
+                    [
+                        transforms.RandomAffine(
+                            degrees=0,
+                            translate=(0.15, 0.15),
+                            scale=(0.8, 1.2),
+                            shear=12,
+                        )
+                    ],
+                    p=0.8,
+                ),
+                transforms.RandomAutocontrast(p=0.5),
+                transforms.RandomEqualize(p=0.3),
+                transforms.RandomApply([transforms.RandomPosterize(bits=3)], p=0.4),
+                transforms.RandomSolarize(threshold=128, p=0.3),
+                transforms.ToTensor(),
+                transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
+            ]
+        )
+
+    raise ValueError(
+        f"Unsupported augment '{augment}'. Choices: {', '.join(SIMCLR_AUGMENTATIONS)}"
     )
-    transform = transforms.Compose(
-        [
-            transforms.RandomResizedCrop(image_size, scale=(0.5, 1.0)),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomApply([transforms.RandomRotation(15)], p=0.3),
-            transforms.RandomApply([color_jitter], p=0.8),
-            transforms.RandomGrayscale(p=0.2),
-            transforms.RandomApply(
-                [transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0))],
-                p=0.5,
-            ),
-            transforms.ToTensor(),
-            transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
-        ]
-    )
-    return TwoCropTransform(transform)
+
+
+def build_simclr_transform(image_size=32, augment="simclr_v1"):
+    return TwoCropTransform(build_simclr_view_transform(image_size, augment))
 
 
 def _sample_labeled_indices(targets, labeled_ratio, seed):
@@ -181,10 +224,11 @@ def build_simclr_pretrain_dataloader(
     image_size=32,
     batch_size=256,
     num_workers=4,
+    augment="simclr_v1",
 ):
     dataset = datasets.ImageFolder(
         root=f"{data_root}/train",
-        transform=build_simclr_transform(image_size),
+        transform=build_simclr_transform(image_size, augment),
     )
     return DataLoader(
         dataset,

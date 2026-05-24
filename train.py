@@ -8,7 +8,16 @@ from data_loader import build_train_val_dataloaders
 from net import build_model
 from plot import plot_confusion_matrix, plot_training_history
 from test import evaluate
-from utils import ensure_dir, get_device, seed_everything
+from utils import (
+    build_run_name,
+    ensure_dir,
+    format_ratio_tag,
+    get_device,
+    resolve_output_dir,
+    resolve_path,
+    save_history_csv,
+    seed_everything,
+)
 
 
 def train_one_epoch(model, data_loader, criterion, optimizer, device):
@@ -42,8 +51,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train baseline AIGC detector.")
     parser.add_argument("--data-root", type=str, default="DL_exp4/data4")
     parser.add_argument("--output-dir", type=str, default="DL_exp4/output/train_val")
+    parser.add_argument("--run-name", type=str, default=None)
     parser.add_argument("--model", type=str, default="resnet18")
-    parser.add_argument("--labeled-ratio", type=float, default=0.1)
+    parser.add_argument("--labeled-ratio", type=float, default=0.01)
     parser.add_argument("--val-ratio", type=float, default=0.2)
     parser.add_argument("--image-size", type=int, default=32)
     parser.add_argument("--epochs", type=int, default=10)
@@ -61,13 +71,20 @@ def main():
     seed_everything(args.seed)
     device = get_device(args.device)
 
-    output_dir = ensure_dir(args.output_dir)
+    data_root = resolve_path(args.data_root, must_exist=True)
+    run_name = args.run_name or build_run_name(
+        "baseline",
+        args.model,
+        format_ratio_tag("label", args.labeled_ratio),
+        format_ratio_tag("val", args.val_ratio),
+    )
+    output_dir = resolve_output_dir(args.output_dir, run_name)
     weights_dir = ensure_dir(output_dir / "weights")
     curves_dir = ensure_dir(output_dir / "curves")
     matrices_dir = ensure_dir(output_dir / "matrices")
 
     train_loader, val_loader, class_names = build_train_val_dataloaders(
-        data_root=args.data_root,
+        data_root=str(data_root),
         labeled_ratio=args.labeled_ratio,
         val_ratio=args.val_ratio,
         image_size=args.image_size,
@@ -91,6 +108,10 @@ def main():
     best_accuracy = -1.0
     best_metrics = None
     best_checkpoint_path = weights_dir / "best_model.pt"
+
+    print(f"Data root: {data_root}")
+    print(f"Run name: {run_name}")
+    print(f"Output dir: {output_dir}")
 
     for epoch in range(1, args.epochs + 1):
         train_metrics = train_one_epoch(
@@ -123,6 +144,7 @@ def main():
             best_metrics = val_metrics
             torch.save({"model_state_dict": model.state_dict()}, best_checkpoint_path)
 
+    save_history_csv(history, curves_dir / "training_history.csv")
     plot_training_history(history, curves_dir / "training_curves.png")
     if best_metrics is not None:
         plot_confusion_matrix(
@@ -133,6 +155,9 @@ def main():
         )
 
     print(f"Best checkpoint: {best_checkpoint_path}")
+    print(f"Curve csv: {curves_dir / 'training_history.csv'}")
+    print(f"Curve figure: {curves_dir / 'training_curves.png'}")
+    print(f"Val matrix: {matrices_dir / 'best_val_confusion_matrix.png'}")
 
 
 if __name__ == "__main__":

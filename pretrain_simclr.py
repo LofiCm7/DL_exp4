@@ -3,10 +3,18 @@ import argparse
 import torch
 from torch.optim import Adam
 
-from data_loader import build_simclr_pretrain_dataloader
+from data_loader import SIMCLR_AUGMENTATIONS, build_simclr_pretrain_dataloader
 from plot import plot_pretraining_history
 from simclr import NTXentLoss, SimCLRModel
-from utils import ensure_dir, get_device, seed_everything
+from utils import (
+    build_run_name,
+    ensure_dir,
+    get_device,
+    resolve_output_dir,
+    resolve_path,
+    save_history_csv,
+    seed_everything,
+)
 
 
 def train_one_epoch(model, data_loader, criterion, optimizer, device):
@@ -36,7 +44,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Pretrain a SimCLR encoder on CIFAKE.")
     parser.add_argument("--data-root", type=str, default="DL_exp4/data4")
     parser.add_argument("--output-dir", type=str, default="DL_exp4/output/simclr_pretrain")
-    parser.add_argument("--model", type=str, default="resnet18")
+    parser.add_argument("--run-name", type=str, default=None)
+    parser.add_argument("--model", type=str, default="mobilenet_v2")
+    parser.add_argument("--augment", type=str, choices=SIMCLR_AUGMENTATIONS, default="simclr_v1")
     parser.add_argument("--image-size", type=int, default=32)
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--batch-size", type=int, default=256)
@@ -56,15 +66,22 @@ def main():
     seed_everything(args.seed)
     device = get_device(args.device)
 
-    output_dir = ensure_dir(args.output_dir)
+    data_root = resolve_path(args.data_root, must_exist=True)
+    run_name = args.run_name or build_run_name("simclr_pretrain", args.model, args.augment)
+    output_dir = resolve_output_dir(args.output_dir, run_name)
     weights_dir = ensure_dir(output_dir / "weights")
     curves_dir = ensure_dir(output_dir / "curves")
 
+    print(f"Data root: {data_root}")
+    print(f"Run name: {run_name}")
+    print(f"Output dir: {output_dir}")
+
     train_loader = build_simclr_pretrain_dataloader(
-        data_root=args.data_root,
+        data_root=str(data_root),
         image_size=args.image_size,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
+        augment=args.augment,
     )
     model = SimCLRModel(
         encoder_name=args.model,
@@ -89,13 +106,18 @@ def main():
             torch.save(
                 {
                     "model": args.model,
+                    "augment": args.augment,
+                    "run_name": run_name,
                     "encoder_state_dict": model.encoder.state_dict(),
                 },
                 best_checkpoint_path,
             )
 
+    save_history_csv(history, curves_dir / "pretraining_history.csv")
     plot_pretraining_history(history, curves_dir / "pretraining_loss_curve.png")
     print(f"Best checkpoint: {best_checkpoint_path}")
+    print(f"Curve csv: {curves_dir / 'pretraining_history.csv'}")
+    print(f"Curve figure: {curves_dir / 'pretraining_loss_curve.png'}")
 
 
 if __name__ == "__main__":

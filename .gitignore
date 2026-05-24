@@ -2,3 +2,4 @@
 output/**
 __pycache__/**
 data4/**
+visualize_augmentations.py
