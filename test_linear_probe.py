@@ -1,53 +1,30 @@
 import argparse
 
-import torch
 import torch.nn as nn
-from sklearn.metrics import accuracy_score, f1_score
 
 from data_loader import build_test_dataloader
-from net import build_model
 from plot import plot_confusion_matrix
+from simclr import load_linear_probe_model
+from test import evaluate
 from utils import ensure_dir, get_device, save_json
 
 
-@torch.no_grad()
-def evaluate(model, data_loader, criterion, device):
-    model.eval()
-
-    total_loss = 0.0
-    all_preds = []
-    all_labels = []
-
-    for images, labels in data_loader:
-        images = images.to(device)
-        labels = labels.to(device)
-
-        logits = model(images)
-        loss = criterion(logits, labels)
-
-        total_loss += loss.item() * images.size(0)
-        all_preds.extend(logits.argmax(dim=1).cpu().tolist())
-        all_labels.extend(labels.cpu().tolist())
-
-    return {
-        "loss": total_loss / len(data_loader.dataset),
-        "accuracy": accuracy_score(all_labels, all_preds),
-        "f1": f1_score(all_labels, all_preds, average="binary"),
-        "y_true": all_labels,
-        "y_pred": all_preds,
-    }
-
-
 def parse_args():
-    parser = argparse.ArgumentParser(description="Evaluate baseline AIGC detector.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate a frozen linear probe on the CIFAKE test set."
+    )
     parser.add_argument("--data-root", type=str, default="DL_exp4/data4")
     parser.add_argument("--checkpoint", type=str, required=True)
-    parser.add_argument("--model", type=str, default="resnet18")
+    parser.add_argument("--model", type=str, default=None)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--image-size", type=int, default=32)
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--output-dir", type=str, default="DL_exp4/output/final_test")
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="DL_exp4/output/final_test_linear_probe",
+    )
     return parser.parse_args()
 
 
@@ -65,10 +42,12 @@ def main():
         batch_size=args.batch_size,
         num_workers=args.num_workers,
     )
-
-    model = build_model(args.model, num_classes=len(class_names)).to(device)
-    checkpoint = torch.load(args.checkpoint, map_location=device)
-    model.load_state_dict(checkpoint["model_state_dict"])
+    model = load_linear_probe_model(
+        args.checkpoint,
+        len(class_names),
+        encoder_name=args.model,
+        map_location=device,
+    ).to(device)
 
     metrics = evaluate(model, test_loader, nn.CrossEntropyLoss(), device)
     print(

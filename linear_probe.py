@@ -5,8 +5,8 @@ import torch.nn as nn
 from torch.optim import Adam
 
 from data_loader import build_train_val_dataloaders
-from net import build_model
 from plot import plot_confusion_matrix, plot_training_history
+from simclr import LinearProbeModel, load_pretrained_encoder
 from test import evaluate
 from utils import ensure_dir, get_device, seed_everything
 
@@ -39,10 +39,17 @@ def train_one_epoch(model, data_loader, criterion, optimizer, device):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train baseline AIGC detector.")
+    parser = argparse.ArgumentParser(
+        description="Train a frozen linear probe on top of a SimCLR encoder."
+    )
     parser.add_argument("--data-root", type=str, default="DL_exp4/data4")
-    parser.add_argument("--output-dir", type=str, default="DL_exp4/output/train_val")
-    parser.add_argument("--model", type=str, default="resnet18")
+    parser.add_argument(
+        "--pretrained-checkpoint",
+        type=str,
+        default="DL_exp4/output/simclr_pretrain/best_pretrain.pt",
+    )
+    parser.add_argument("--output-dir", type=str, default="DL_exp4/output/linear_probe")
+    parser.add_argument("--model", type=str, default=None)
     parser.add_argument("--labeled-ratio", type=float, default=0.1)
     parser.add_argument("--val-ratio", type=float, default=0.2)
     parser.add_argument("--image-size", type=int, default=32)
@@ -76,9 +83,13 @@ def main():
         seed=args.seed,
     )
 
-    model = build_model(args.model, num_classes=len(class_names)).to(device)
+    encoder, feature_dim, model_name = load_pretrained_encoder(
+        args.pretrained_checkpoint,
+        encoder_name=args.model,
+    )
+    model = LinearProbeModel(encoder, feature_dim, len(class_names)).to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = Adam(model.classifier.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
     history = {
         "epoch": [],
@@ -90,16 +101,10 @@ def main():
     }
     best_accuracy = -1.0
     best_metrics = None
-    best_checkpoint_path = weights_dir / "best_model.pt"
+    best_checkpoint_path = weights_dir / "best_linear_probe.pt"
 
     for epoch in range(1, args.epochs + 1):
-        train_metrics = train_one_epoch(
-            model,
-            train_loader,
-            criterion,
-            optimizer,
-            device,
-        )
+        train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device)
         val_metrics = evaluate(model, val_loader, criterion, device)
 
         history["epoch"].append(epoch)
@@ -121,7 +126,14 @@ def main():
         if val_metrics["accuracy"] > best_accuracy:
             best_accuracy = val_metrics["accuracy"]
             best_metrics = val_metrics
-            torch.save({"model_state_dict": model.state_dict()}, best_checkpoint_path)
+            torch.save(
+                {
+                    "model": model_name,
+                    "encoder_state_dict": model.encoder.state_dict(),
+                    "classifier_state_dict": model.classifier.state_dict(),
+                },
+                best_checkpoint_path,
+            )
 
     plot_training_history(history, curves_dir / "training_curves.png")
     if best_metrics is not None:
